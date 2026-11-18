@@ -139,6 +139,42 @@ of tokens before answering.
 Observed: model status `loaded`, 151 generated tokens, roughly 40–45 tokens/s,
 GPU 0 around 15.7 GiB used, GPU 1 idle.
 
+### 5. Stop the server
+
+Stop it cleanly so the engine can release its CUDA context and pinned host
+memory.
+
+If the server is running in the foreground, press Ctrl+C once. Wait for:
+
+```text
+[strata] stopping (Ctrl+C again to end the engine at once) ...
+[strata] stopped
+```
+
+Do not press Ctrl+C a second time unless the first one is ignored. A second
+Ctrl+C ends the engine at once and skips cleanup.
+
+If the server was started in the background, send the same signal by PID:
+
+```bash
+pgrep -af "serve/server.py"
+kill -INT <pid>
+```
+
+Wait up to 20 seconds. If the process is still alive, use `kill -TERM <pid>`.
+Only use `kill -KILL <pid>` as a last resort, because it skips engine cleanup.
+
+Confirm it is down:
+
+```bash
+pgrep -af "serve/server.py"
+curl -sS --max-time 3 http://127.0.0.1:8080/v1/models
+nvidia-smi --query-gpu=index,memory.used --format=csv
+```
+
+There should be no server process, the `curl` command should fail with a
+connection error, and GPU 0 should drop back to about 4 MiB used.
+
 ## Updating dependencies
 
 1. Edit `requirements.bak.txt` at the repo root.
