@@ -2,7 +2,8 @@
   description = "Nix environment for Strata";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    inputs.myflake.inputs.nixpkgs.follows = "nixpkgs";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
   };
   outputs = inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
@@ -18,12 +19,8 @@
           packages.engine-cuda = pkg.engine-cuda;
           packages.engine-rocm = pkg.engine-rocm;
           devShells.default = pkgs.mkShell {
-            packages = [ pkgs.python313Packages.pip ];
-            nativeBuildInputs = [ pkg.servePkg ];
-            # Ensure strata-env Python is first in PATH (before system Python)
-            shellHook = ''
-              export PATH="${pkg.servePkg}/bin/strata-env:$PATH"
-            '';  
+            packages = [ pkg.servePkg ];
+            inputsFrom = [ pkg.servePkg ];
           };
         };
     };
