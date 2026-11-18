@@ -1,0 +1,56 @@
+[project]
+name = "strata"
+version = "0.1.59.1"
+description = "Strata GPU-accelerated inference engine server"
+requires-python = ">=3.12"
+dependencies = [
+    "certifi==2026.10.19",
+    "charset-normalizer==3.5.1",
+    "cmake==4.4.3",
+    "idna==3.20",
+    "iniconfig==2.3.1",
+    "jinja2==3.1.6",
+    "linkify-it-py==2.2.0",
+    "markdown-it-py==4.3.0",
+    "markupsafe==3.0.3",
+    "mdit-py-plugins==0.7.0",
+    "mdurl==0.1.2",
+    "ninja==1.13.2",
+    "numpy==2.5.3",
+    "packaging==26.3",
+    "pillow==13.0.0",
+    "platformdirs==4.14.5",
+    "pluggy==1.7.0",
+    "psutil==7.2.2",
+    "pygments==2.21.0",
+    "pytest==9.1.1",
+    "pyyaml==6.0.3",
+    "regex==2026.9.10",
+    "requests==2.34.2",
+    "rich==15.0.0",
+    "textual==8.2.8",
+    "tqdm==4.70.1",
+    "truststore==0.10.5",
+    "typing-extensions==4.16.0",
+    "urllib3==2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "textual==8.2.8",
+]
+
+build = [
+    "cmake==4.4.3",
+    "ninja==1.13.2",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest==9.1.1",
+    "textual==8.2.8",
+]
+
+[tool.uv.sources]
+# Add any custom sources here if needed
