@@ -84,7 +84,7 @@ Build the NixOS-compatible version:
 nix build --expr '
   let
     pkgs = import <nixpkgs> { config.allowUnfree = true; config.cudaSupport = true; };
-    pkg = pkgs.callPackage ./package.nix { backend = "cuda"; cudaArch = "60"; };
+    pkg = pkgs.callPackage ./nix/package.nix { backend = "cuda"; cudaArch = "60"; };
   in pkg.engine-cuda.overrideAttrs (old: {
     cmakeFlags = (old.cmakeFlags or []) ++ [ "-DSTRATA_EXPERIMENTAL_SM60=ON" ];
   })

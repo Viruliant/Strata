@@ -18,7 +18,7 @@
 #   nix develop                        # Dev shell with locked Python env
 #
 # Variants via .override (nixpkgs pattern):
-#   strata = pkgs.callPackage ./package.nix {};
+#   strata = pkgs.callPackage ./nix/package.nix {};
 #   strata-cuda = strata.override { backend = "cuda"; };
 #
 # so everything must be self-contained.
@@ -63,14 +63,14 @@ let
   python = pkgs'.python312;
 
   workspace = uv2nix.lib.workspace.loadWorkspace {
-    workspaceRoot = ./nix;
+    workspaceRoot = ./.;
   };
 
   uvLockedOverlay = workspace.mkPyprojectOverlay {
     sourcePreference = "wheel";
   };
 
-  myCustomOverrides = import ./nix/myCustomOverrides.nix {
+  myCustomOverrides = import ./myCustomOverrides.nix {
     pkgs = pkgs';
     inherit python;
   };
@@ -101,9 +101,9 @@ let
     hostDist = pkgs.buildNpmPackage {
       pname = "strata-host";
       version = "0.2.14";
-      src = ./apps/host;
+      src = ../apps/host;
       npmDeps = pkgs.fetchNpmDeps {
-        src = ./apps/host;
+        src = ../apps/host;
         hash = "sha256-Y64w7UCnm3ZOhabqLkITsbC8n0HqzGZmY4cOkV67U+M=";
       };
 
@@ -116,13 +116,13 @@ let
     tauriSrc = pkgs.rustPlatform.buildRustPackage {
       pname = "strata-desktop-src";
       version = "0.2.14";
-      src = ./apps/desktop/src-tauri;
+      src = ../apps/desktop/src-tauri;
       doCheck = false;  # placeholder server triggers test failure
 
       # Use cargo vendor to fetch deps into Nix store
       # (enabled by default as of nixpkgs 25.05)
       cargoLock = {
-        lockFile = ./apps/desktop/src-tauri/Cargo.lock;
+        lockFile = ../apps/desktop/src-tauri/Cargo.lock;
       };
 
       # Rust toolchain + pkg-config for GTK/WebKit detection
@@ -178,9 +178,9 @@ let
         # Create a parent directory structure so ../../host works
         mkdir -p ../host
         ln -sf ${hostDist} ../host/dist
-        cp ${./apps/host/package.json} ../host/package.json
+        cp ${../apps/host/package.json} ../host/package.json
         # Use the real host server
-        cp -r ${./apps/host/server}/. ../host/server/
+        cp -r ${../apps/host/server}/. ../host/server/
 
         # Create placeholder dirs for other Tauri bundle resources
         mkdir -p resources/node resources/control resources/harness resources/engine-bundle
@@ -325,7 +325,7 @@ let
     stdenv.mkDerivation (rec {
       pname = "strata-engine";
       version = "0.1.59.1";
-      src = ./.;
+      src = ../.;
 
       inherit nativeBuildInputs buildInputs cmakeFlags;
 
@@ -389,7 +389,7 @@ let
   servePkg = pkgs'.stdenv.mkDerivation (rec {
     pname = "strata";
     version = "0.1.59.1";
-    src = ./.;
+    src = ../.;
     mainProgram = "${pname}";
 
     nativeBuildInputs = [
@@ -424,11 +424,11 @@ let
       done
 
       mkdir -p $out/share/${pname}
-      tar -cf - -C ${./serve} . | tar -xf - -C $out/share/${pname}/
+      tar -cf - -C ${../serve} . | tar -xf - -C $out/share/${pname}/
       chmod -R u+w $out/share/${pname}
 
       # Copy setup.py and requirements files for setup command
-      cp -f ${./setup.py} $out/share/${pname}/setup.py
+      cp -f ${../setup.py} $out/share/${pname}/setup.py
       cp -f ${./requirements.bak.txt} $out/share/${pname}/requirements.bak.txt
 
       cat > $out/bin/${pname} <<'LAUNCHER'

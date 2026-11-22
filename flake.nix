@@ -11,7 +11,7 @@
       perSystem = { system, pkgs, ... }:
         let
           # Default: Desktop app (Tauri) for `nix run`
-          pkg = pkgs.callPackage ./package.nix { };
+          pkg = pkgs.callPackage ./nix/package.nix { };
         in {
           packages.default = pkg.default;
           packages.servePkg = pkg.servePkg;

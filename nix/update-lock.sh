@@ -29,7 +29,7 @@ echo ""
 
 # Step 1: Generate requirements.txt from requirements.bak.txt
 echo "Step 1: Compiling requirements..."
-uv pip compile ../requirements.bak.txt -o requirements.txt --upgrade --prerelease=allow
+uv pip compile requirements.bak.txt -o requirements.txt --upgrade --prerelease=allow
 echo "  ✓ Generated requirements.txt"
 echo ""
 

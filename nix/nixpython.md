@@ -38,7 +38,7 @@ The pipeline starts with `requirements.bak.txt`, which the user edits:
 
 1. **`uv pip compile`**: Resolves `requirements.bak.txt` to a fully pinned `requirements.txt`
    ```bash
-   uv pip compile ../requirements.bak.txt -o requirements.txt --upgrade --prerelease=allow
+   uv pip compile requirements.bak.txt -o requirements.txt --upgrade --prerelease=allow
    ```
 
 2. **`gen_toml`**: Creates `pyproject.toml` with the dependency list and configures PyTorch CPU index:
@@ -67,7 +67,7 @@ When you run `nix build`, Nix evaluates `flake.nix`:
     flake-parts.lib.mkFlake { inherit inputs; } {
       perSystem = { system, pkgs, ... }:
         let
-          pkg = pkgs.callPackage ./package.nix { };
+          pkg = pkgs.callPackage ./nix/package.nix { };
         in {
           packages.default = pkg;
           devShells.default = pkgs.mkShell {
@@ -108,7 +108,7 @@ pyproject-build-systems = import (builtins.fetchGit {
 
 ```nix
 workspace = uv2nix.lib.workspace.loadWorkspace {
-  workspaceRoot = ./nix;
+  workspaceRoot = ./.;
 };
 ```
 

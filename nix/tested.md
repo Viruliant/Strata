@@ -9,10 +9,10 @@ The base commit `baf16363b` contains no `nix/` directory or `requirements.bak.tx
 The staged setup therefore needs these files from commit `346dd5ff1`, not only the
 six originally named:
 
-- `flake.nix`, `package.nix`
+- `flake.nix`, `nix/package.nix`
 - `nix/Lock2LocalPkgs.sh`, `nix/nixpython.md`, `nix/requirements.txt`, `nix/update-lock.sh`
-- `nix/myCustomOverrides.nix`, `nix/pyproject.toml`, `nix/uv.lock` (required by `package.nix`)
-- `requirements.bak.txt` at the repo root (required by `package.nix`)
+- `nix/myCustomOverrides.nix`, `nix/pyproject.toml`, `nix/uv.lock` (required by `nix/package.nix`)
+- `nix/requirements.bak.txt` (required by `nix/package.nix`)
 
 Without the last four, `nix build` still succeeds but `nix develop` fails while
 evaluating the Python environment.
