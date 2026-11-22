@@ -21,7 +21,20 @@
 #   strata = pkgs.callPackage ./nix/package.nix {};
 #   strata-cuda = strata.override { backend = "cuda"; };
 #
-# so everything must be self-contained.
+# nixpkgs config (unfree + CUDA) comes from flake.nix via _module.args.pkgs,
+# so callers must pass a pkgs with that config enabled.
+
+# |   Code (sm_XX)  |  Cuda Arch  | Architecture            |
+# |:---------------:|:-----------:|-------------------------|
+# | 60 (61, 62)     | 6.0 – 6.2   | Pascal                  |
+# | 70 (72)         | 7.0 – 7.2   | Volta                   |
+# | 75              | 7.5         | Turing                  |
+# | 80 (86, 87)     | 8.0 – 8.7   | Ampere                  |
+# | 89              | 8.9         | Ada Lovelace            |
+# | 90 (90a)        | 9.0         | Hopper                  |
+# | 100 (100f, 103) | 10.0 – 10.3 | Blackwell (Data Center) |
+# | 110 (110a)      | 11.0        | Blackwell (Edge Device) |
+# | 120 (120f, 121) | 12.0 – 12.1 | Blackwell (Workstation) |
 
 { pkgs
 , backend ? "cuda"
@@ -33,34 +46,27 @@ let
 
   projectName = "strata";
 
-  # Allow unfree packages (CUDA toolkit)
-  pkgs' = import pkgs.path {
-    inherit (pkgs) system;
-    config.allowUnfree = true;
-    config.cudaSupport = true;
-  };
-
   # -- pyproject-nix ecosystem ----------------------------------------------
-  pyproject-nix = import (pkgs'.fetchgit {
+  pyproject-nix = import (pkgs.fetchgit {
     url = "https://github.com/pyproject-nix/pyproject.nix.git";
     rev = "ddc400a6883b042646d0940e65971bb7f7e96107";
     sha256 = "sha256-vcCAvhtA7hG+/gOge29hYHy7I/dLkIsr5nLx4sFEQic=";
   }) { inherit lib; };
 
-  uv2nix = import (pkgs'.fetchgit {
+  uv2nix = import (pkgs.fetchgit {
     url = "https://github.com/pyproject-nix/uv2nix.git";
     rev = "a541fda20d6784d88789cfcb221638b7c25a23dd";
     sha256 = "sha256-PeENT3Fu7a7YrX5zIHjdxai8GzPcxpKn+nQsgByhwNo=";
   }) { inherit pyproject-nix lib; };
 
-  pyproject-build-systems = import (pkgs'.fetchgit {
+  pyproject-build-systems = import (pkgs.fetchgit {
     url = "https://github.com/pyproject-nix/build-system-pkgs.git";
     rev = "953d35d03a51dbecaf3feb3fb679eb63e90ebeb4";
     sha256 = "sha256-pyru9MpuXRiyq0Bd4q0nHpL4T6HCuZT4B+alcgAYE4A=";
   }) { inherit pyproject-nix uv2nix lib; };
 
   # python312: numpy==2.5.3 only ships wheels up to cp312
-  python = pkgs'.python312;
+  python = pkgs.python312;
 
   workspace = uv2nix.lib.workspace.loadWorkspace {
     workspaceRoot = ./.;
@@ -71,11 +77,10 @@ let
   };
 
   myCustomOverrides = import ./myCustomOverrides.nix {
-    pkgs = pkgs';
-    inherit python;
+    inherit pkgs python;
   };
 
-  pythonSet = (pkgs'.callPackage pyproject-nix.build.packages {
+  pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
     inherit python;
   }).overrideScope (
     lib.composeManyExtensions [
@@ -264,38 +269,38 @@ let
       isCpu  = backend == "cpu";
 
       # GCC 14 for CUDA (nvcc rejects GCC > 14)
-      stdenv = if isCuda then pkgs'.gcc14Stdenv else pkgs'.stdenv;
+      stdenv = if isCuda then pkgs.gcc14Stdenv else pkgs.stdenv;
 
       # CUDA toolkit (12.9)
-      cudaToolkit = pkgs'.cudaPackages_12_9.cudatoolkit;
-      nvcc        = pkgs'.cudaPackages_12_9.cuda_nvcc;
+      cudaToolkit = pkgs.cudaPackages_12_9.cudatoolkit;
+      nvcc        = pkgs.cudaPackages_12_9.cuda_nvcc;
 
       # ROCm toolkit
-      rocmRuntime = pkgs'.rocmPackages.rocm-runtime;
-      rocblas     = pkgs'.rocmPackages.rocblas;
-      hipRuntime  = pkgs'.rocmPackages.clr;
+      rocmRuntime = pkgs.rocmPackages.rocm-runtime;
+      rocblas     = pkgs.rocmPackages.rocblas;
+      hipRuntime  = pkgs.rocmPackages.clr;
 
       # Common build tools
-      cmake' = pkgs'.cmake;
-      ninja' = pkgs'.ninja;
+      cmake' = pkgs.cmake;
+      ninja' = pkgs.ninja;
 
       # Backend-specific inputs
       nativeBuildInputs = [
         cmake'
         ninja'
-        pkgs'.makeWrapper
+        pkgs.makeWrapper
       ] ++ lib.optionals isCuda [ nvcc ];
 
       buildInputs =
         lib.optionals isCuda [
           cudaToolkit
-          pkgs'.cudaPackages_12_9.libcublas
+          pkgs.cudaPackages_12_9.libcublas
         ]
         ++ lib.optionals isRocm [
           rocmRuntime
           hipRuntime
           rocblas
-          pkgs'.rocmPackages.miopen
+          pkgs.rocmPackages.miopen
         ];
 
       # CMake flags per backend
@@ -333,8 +338,8 @@ let
       env = lib.optionalAttrs isCuda {
         CUDA_HOME = "${cudaToolkit}";
         CUDA_PATH = "${cudaToolkit}";
-        # CUDAHOSTCXX = "${pkgs'.stdenv.cc}/bin/c++";
-        CUDAHOSTCXX = "${pkgs'.gcc14}/bin/g++";
+        # CUDAHOSTCXX = "${pkgs.stdenv.cc}/bin/c++";
+        CUDAHOSTCXX = "${pkgs.gcc14}/bin/g++";
       } // lib.optionalAttrs isRocm {
         ROCM_PATH = "${rocmRuntime}";
         HIP_PATH = "${hipRuntime}";
@@ -366,9 +371,9 @@ let
   # The Nix CUDA split means nvcc lives in cuda_nvcc but headers/libs are in cudatoolkit.
   # setup.py computes toolkit root from nvcc location, so we need to override it.
   cudaBuildEnv = let
-    cudaToolkit = pkgs'.cudaPackages_12_9.cudatoolkit;
-    nvcc        = pkgs'.cudaPackages_12_9.cuda_nvcc;
-    gcc14       = pkgs'.gcc14;
+    cudaToolkit = pkgs.cudaPackages_12_9.cudatoolkit;
+    nvcc        = pkgs.cudaPackages_12_9.cuda_nvcc;
+    gcc14       = pkgs.gcc14;
   in {
     # Point STRATA_NVCC to the actual nvcc (not the symlink in merged toolkit)
     STRATA_NVCC = "${nvcc}/bin/nvcc";
@@ -386,7 +391,7 @@ let
 
   # -- Python serve environment ---------------------------------------------
   # Still available for `nix build` or development.
-  servePkg = pkgs'.stdenv.mkDerivation (rec {
+  servePkg = pkgs.stdenv.mkDerivation (rec {
     pname = "strata";
     version = "0.1.59.1";
     src = ../.;
@@ -394,22 +399,22 @@ let
 
     nativeBuildInputs = [
       appPythonEnv
-      pkgs'.makeWrapper
-      pkgs'.cudaPackages_12_9.cudatoolkit  # headers + libs for engine build
-      pkgs'.cudaPackages_12_9.cuda_nvcc    # nvcc compiler
-      pkgs'.gcc14                          # host compiler (nvcc rejects GCC > 14)
+      pkgs.makeWrapper
+      pkgs.cudaPackages_12_9.cudatoolkit  # headers + libs for engine build
+      pkgs.cudaPackages_12_9.cuda_nvcc    # nvcc compiler
+      pkgs.gcc14                          # host compiler (nvcc rejects GCC > 14)
     ];
 
     # CUDA environment for setup.py engine compilation
     # The Nix CUDA split: nvcc is in cuda_nvcc, headers/libs in cudatoolkit
     env = {
-      STRATA_NVCC = "${pkgs'.cudaPackages_12_9.cuda_nvcc}/bin/nvcc";
-      CUDA_PATH = "${pkgs'.cudaPackages_12_9.cudatoolkit}";
-      CUDA_HOME = "${pkgs'.cudaPackages_12_9.cudatoolkit}";
-      CUDA_TOOLKIT_ROOT_DIR = "${pkgs'.cudaPackages_12_9.cudatoolkit}";
-      CC = "${pkgs'.gcc14}/bin/gcc";
-      CXX = "${pkgs'.gcc14}/bin/g++";
-      CUDAHOSTCXX = "${pkgs'.gcc14}/bin/g++";
+      STRATA_NVCC = "${pkgs.cudaPackages_12_9.cuda_nvcc}/bin/nvcc";
+      CUDA_PATH = "${pkgs.cudaPackages_12_9.cudatoolkit}";
+      CUDA_HOME = "${pkgs.cudaPackages_12_9.cudatoolkit}";
+      CUDA_TOOLKIT_ROOT_DIR = "${pkgs.cudaPackages_12_9.cudatoolkit}";
+      CC = "${pkgs.gcc14}/bin/gcc";
+      CXX = "${pkgs.gcc14}/bin/g++";
+      CUDAHOSTCXX = "${pkgs.gcc14}/bin/g++";
     };
 
     installPhase = ''
@@ -436,7 +441,7 @@ let
       exec @OUT@/bin/@NAME@-env/python3 @OUT@/share/@NAME@/server.py "$@"
       LAUNCHER
       sed -i 's|@BASH@|@BASHVAL@|' $out/bin/${pname}
-      sed -i "s|@BASHVAL@|${pkgs'.bash}/bin/bash|" $out/bin/${pname}
+      sed -i "s|@BASHVAL@|${pkgs.bash}/bin/bash|" $out/bin/${pname}
       sed -i "s|@OUT@|$out|g" $out/bin/${pname}
       sed -i "s|@NAME@|${pname}|g" $out/bin/${pname}
       chmod +x $out/bin/${pname}
@@ -444,18 +449,18 @@ let
       # Create setup wrapper (injects CUDA env vars for engine compilation)
       cat > $out/bin/${pname}-setup <<LAUNCHER
       #!@BASH@
-      export STRATA_NVCC="${pkgs'.cudaPackages_12_9.cuda_nvcc}/bin/nvcc"
-      export CUDA_PATH="${pkgs'.cudaPackages_12_9.cudatoolkit}"
-      export CUDA_HOME="${pkgs'.cudaPackages_12_9.cudatoolkit}"
-      export CUDA_TOOLKIT_ROOT_DIR="${pkgs'.cudaPackages_12_9.cudatoolkit}"
-      export CC="${pkgs'.gcc14}/bin/gcc"
-      export CXX="${pkgs'.gcc14}/bin/g++"
-      export CUDAHOSTCXX="${pkgs'.gcc14}/bin/g++"
-      export PATH="${pkgs'.cudaPackages_12_9.cuda_nvcc}/bin:${pkgs'.cudaPackages_12_9.cudatoolkit}/bin:$PATH"
+      export STRATA_NVCC="${pkgs.cudaPackages_12_9.cuda_nvcc}/bin/nvcc"
+      export CUDA_PATH="${pkgs.cudaPackages_12_9.cudatoolkit}"
+      export CUDA_HOME="${pkgs.cudaPackages_12_9.cudatoolkit}"
+      export CUDA_TOOLKIT_ROOT_DIR="${pkgs.cudaPackages_12_9.cudatoolkit}"
+      export CC="${pkgs.gcc14}/bin/gcc"
+      export CXX="${pkgs.gcc14}/bin/g++"
+      export CUDAHOSTCXX="${pkgs.gcc14}/bin/g++"
+      export PATH="${pkgs.cudaPackages_12_9.cuda_nvcc}/bin:${pkgs.cudaPackages_12_9.cudatoolkit}/bin:$PATH"
       exec @OUT@/bin/@NAME@-env/python3 @OUT@/share/@NAME@/setup.py "$@"
       LAUNCHER
       sed -i 's|@BASH@|@BASHVAL@|' $out/bin/${pname}-setup
-      sed -i "s|@BASHVAL@|${pkgs'.bash}/bin/bash|" $out/bin/${pname}-setup
+      sed -i "s|@BASHVAL@|${pkgs.bash}/bin/bash|" $out/bin/${pname}-setup
       sed -i "s|@OUT@|$out|g" $out/bin/${pname}-setup
       sed -i "s|@NAME@|${pname}|g" $out/bin/${pname}-setup
       chmod +x $out/bin/${pname}-setup

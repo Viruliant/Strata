@@ -13,6 +13,11 @@
           # Default: Desktop app (Tauri) for `nix run`
           pkg = pkgs.callPackage ./nix/package.nix { };
         in {
+          _module.args.pkgs = import inputs.nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+            config.cudaSupport = true;
+          };
           packages.default = pkg.default;
           packages.servePkg = pkg.servePkg;
           packages.engine-cpu  = pkg.engine-cpu;
